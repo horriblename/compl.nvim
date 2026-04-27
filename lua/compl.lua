@@ -563,7 +563,7 @@ function M._start_snippet()
 
 	M._snippet.items = {}
 	for _, root in ipairs(M._opts.snippet.paths) do
-		local manifest_path = table.concat({ root, "package.json" }, M._sep)
+		local manifest_path = root .. "/package.json"
 		M._async_read_json(manifest_path, function(manifest_data)
 			vim.iter(ipairs((manifest_data.contributes and manifest_data.contributes.snippets) or {}))
 				:filter(function(_, s)
@@ -576,7 +576,7 @@ function M._start_snippet()
 					end
 				end)
 				:map(function(_, snippet_contribute)
-					return vim.fn.resolve(table.concat({ root, snippet_contribute.path }, M._sep))
+					return vim.fn.resolve(root .. "/" .. snippet_contribute.path)
 				end)
 				:each(function(snippet_path)
 					M._async_read_json(snippet_path, parse_snippet_data)
@@ -586,20 +586,6 @@ function M._start_snippet()
 
 	M._start_snippet_server()
 end
-
--- https://github.com/nvim-lua/plenary.nvim/blob/master/lua/plenary/path.lua#L21
-M._sep = (function()
-	if jit then
-		local os = string.lower(jit.os)
-		if os ~= "windows" then
-			return "/"
-		else
-			return "\\"
-		end
-	else
-		return package.config:sub(1, 1)
-	end
-end)()
 
 function M._start_snippet_server()
 	if M._snippet.client_id then
