@@ -151,7 +151,9 @@ function M._start_completion()
 	M._ctx.cursor = { row, col }
 
 	-- Make a request to get completion items
-	local position_params = M._make_position_params()
+	local position_params = function(client, _)
+		return vim.lsp.util.make_position_params(0, client.offset_encoding)
+	end
 	local cancel_fn = vim.lsp.buf_request_all(bufnr, "textDocument/completion", position_params, function(responses)
 		-- Apply itemDefaults to completion item as per the LSP specs:
 		--
@@ -169,7 +171,7 @@ function M._start_completion()
 			:each(function(_, response)
 				local itemDefaults = response.result.itemDefaults
 				local items = response.result.items or response.result or {}
-				vim.iter(ipairs(items)):each(function(_, item)
+				for _, item in ipairs(items) do
 					-- https://github.com/neovim/neovim/blob/master/runtime/lua/vim/lsp/completion.lua#L173
 					item.insertTextFormat = item.insertTextFormat or itemDefaults.insertTextFormat
 					item.insertTextMode = item.insertTextMode or itemDefaults.insertTextMode
@@ -185,7 +187,7 @@ function M._start_completion()
 							textEdit.replace = itemDefaults.editRange.replace
 						end
 					end
-				end)
+				end
 			end)
 		M._completion.responses = responses
 
@@ -274,14 +276,10 @@ function _G.Compl.completefunc(findstart, base)
 		end
 
 		-- Sort by frecency
-		local a_frequency = vim.tbl_get(M._ctx.completion_history, a.label, "frequency")
-		local a_accepted_at = vim.tbl_get(M._ctx.completion_history, a.label, "accepted_at")
-		local a_frecency_score = M._calculate_frecency_score(a_frequency, a_accepted_at)
-		local b_frequency = vim.tbl_get(M._ctx.completion_history, b.label, "frequency")
-		local b_accepted_at = vim.tbl_get(M._ctx.completion_history, b.label, "accepted_at")
-		local b_frecency_score = M._calculate_frecency_score(b_frequency, b_accepted_at)
-		if a_frecency_score ~= b_frecency_score then
-			return a_frecency_score > b_frecency_score
+		local a_score = M._frecency(M._ctx.completion_history[a.label])
+		local b_score = M._frecency(M._ctx.completion_history[b.label])
+		if a_score ~= b_score then
+			return a_score > b_score
 		end
 
 		-- Sort by ordinal value of 'kind'.
@@ -545,9 +543,9 @@ function M._start_snippet()
 	local filetype = vim.bo.filetype
 
 	local parse_snippet_data = function(snippet_data)
-		vim.iter(pairs(snippet_data or {})):each(function(_, snippet)
+		for _, snippet in pairs(snippet_data or {}) do
 			local prefixes = type(snippet.prefix) == "table" and snippet.prefix or { snippet.prefix }
-			vim.iter(ipairs(prefixes)):each(function(_, prefix)
+			for _, prefix in ipairs(prefixes) do
 				table.insert(M._snippet.items, {
 					detail = "snippet",
 					label = prefix,
@@ -559,12 +557,12 @@ function M._start_snippet()
 					insertTextFormat = vim.lsp.protocol.InsertTextFormat.Snippet,
 					insertText = type(snippet.body) == "table" and table.concat(snippet.body, "\n") or snippet.body,
 				})
-			end)
-		end)
+			end
+		end
 	end
 
 	M._snippet.items = {}
-	vim.iter(ipairs(M._opts.snippet.paths)):each(function(_, root)
+	for _, root in ipairs(M._opts.snippet.paths) do
 		local manifest_path = table.concat({ root, "package.json" }, M._sep)
 		M._async_read_json(manifest_path, function(manifest_data)
 			vim.iter(ipairs((manifest_data.contributes and manifest_data.contributes.snippets) or {}))
@@ -584,7 +582,7 @@ function M._start_snippet()
 					M._async_read_json(snippet_path, parse_snippet_data)
 				end)
 		end)
-	end)
+	end
 
 	M._start_snippet_server()
 end
@@ -661,12 +659,6 @@ function M._async_read_json(file, callback)
 	end)
 end
 
-function M._make_position_params()
-	return function(client, _)
-		return vim.lsp.util.make_position_params(0, client.offset_encoding)
-	end
-end
-
 function M._make_lsp_server(completion_items)
 	return function(dispatchers)
 		local closing = false
@@ -705,18 +697,13 @@ function M._make_lsp_server(completion_items)
 	end
 end
 
-function M._calculate_frecency_score(frequency, accepted_at)
-	frequency, accepted_at = frequency or 0, accepted_at or -1
-	return frequency * M._calculate_recency_weight(accepted_at)
-end
-
-function M._calculate_recency_weight(accepted_at)
-	if accepted_at < 0 then
-		return 1
+function M._frecency(entry)
+	if not entry then
+		return 0
 	end
-	local age_in_ms = vim.uv.now() - accepted_at
+	local age_in_ms = vim.uv.now() - entry.accepted_at
 	local half_life = 10 * 60 * 1000 -- 10mins
-	return 100 * math.exp(-math.log(2) * age_in_ms / half_life)
+	return entry.frequency * 100 * math.exp(-math.log(2) * age_in_ms / half_life)
 end
 
 return M
