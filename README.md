@@ -20,24 +20,30 @@ A lightweight, native-first completion experience for Neovim.
 Focused on leveraging Neovim's native completion infrastructure (See `:h ins-completion`) and built-in LSP client, without external dependencies. The goal is to provide a lightweight and performant completion experience that feels like a natural extension of Neovim itself, while maintaining essential features.
 
 ## Installation
-**Using [lazy.nvim](https://github.com/folke/lazy.nvim):**
+**Using the built-in plugin manager (See `:h vim.pack`):**
 ```lua
-{
-  "brianaung/compl.nvim",
-  opts = {
-    -- Default options (no need to set them again)
-    completion = {
-      fuzzy = false,
-      timeout = 100,
+vim.pack.add {
+  "https://github.com/brianaung/compl.nvim",
+  -- Optional: a VS Code style snippet collection. See "Using VS Code style custom snippets" below.
+  "https://github.com/rafamadriz/friendly-snippets",
+}
+
+require("compl").setup {
+  -- Default options (no need to set them again)
+  completion = {
+    fuzzy = false,
+    timeout = 100,
+  },
+  info = {
+    enable = true,
+    timeout = 100,
+  },
+  snippet = {
+    enable = false,
+    paths = {
+      -- Optional: point to the package.json manifest of an installed snippet collection.
+      vim.fn.stdpath "data" .. "/site/pack/core/opt/friendly-snippets",
     },
-    info = {
-      enable = true,
-      timeout = 100,
-    },
-    snippet = {
-      enable = false,
-      paths = {},
-    }
   },
 }
 ```
@@ -96,29 +102,6 @@ end, { expr = true })
 ## Using VS Code style custom snippets
 You can seamlessly integrate custom snippets into your existing completion workflow without any additional dependencies. Snippets from the specified paths are parsed and formatted into appropriate LSP responses, and are passed into a lightweight internal LSP server, which then returns them as completion items when Neovim's LSP client sends a `textDocument/completion` request.
 
-### Example: Using Friendly Snippets
-To use a collection of snippets such as those provided in [rafamadriz/friendly-snippets](https://github.com/rafamadriz/friendly-snippets), install it as a dependency and point to the location of its `package.json` manifest file. Here's how to configure it using `lazy.nvim`:
-
-```lua
-{
-  "brianaung/compl.nvim",
-  dependencies = {
-    "rafamadriz/friendly-snippets"
-  },
-  opts = {
-    -- ...
-    snippet = {
-      enable = true,
-      paths = {
-	vim.fn.stdpath "data" .. "/lazy/friendly-snippets",
-	-- You can include more paths that contains the package.json manifest for your custom snippets. See below for defining your own snippets.
-      },
-    },
-    -- ...
-  },
-}
-```
-
 ### Defining Your Own Snippets
 If you'd like to define your own snippets for a specific language, you can create a JSON file with your snippets following this [syntax](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_create-your-own-snippets).
 
@@ -131,6 +114,7 @@ You’ll then need to create a [`package.json` manifest](https://code.visualstud
 - https://www.reddit.com/r/neovim/comments/1g1x0v3/hacking_native_snippets_into_lsp_for_builtin/?rdt=41546
 
 ## Similar alternatives
+- [blink.cmp](https://github.com/saghen/blink.cmp)
 - [nvim-cmp](https://github.com/hrsh7th/nvim-cmp)
 - [mini.completion](https://github.com/echasnovski/mini.completion)
 - [coq_nvim](https://github.com/ms-jpq/coq_nvim)
