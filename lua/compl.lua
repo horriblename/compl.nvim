@@ -59,17 +59,16 @@ function M.setup(opts)
 
 	-- apply and validate settings
 	M._opts = vim.tbl_deep_extend("force", M._opts, opts or {})
-	vim.validate {
-		["completion"] = { M._opts.completion, "t" },
-		["completion.timeout"] = { M._opts.completion.timeout, "n" },
-		["completion.fuzzy"] = { M._opts.completion.fuzzy, "b" },
-		["info"] = { M._opts.info, "t" },
-		["info.enable"] = { M._opts.info.enable, "b" },
-		["info.timeout"] = { M._opts.info.timeout, "n" },
-		["snippet"] = { M._opts.snippet, "t" },
-		["snippet.enable"] = { M._opts.snippet.enable, "b" },
-		["snippet.paths"] = { M._opts.snippet.paths, "t" },
-	}
+	vim.validate("completion", M._opts.completion, "table")
+	vim.validate("completion", M._opts.completion, "table")
+	vim.validate("completion.timeout", M._opts.completion.timeout, "number")
+	vim.validate("completion.fuzzy", M._opts.completion.fuzzy, "boolean")
+	vim.validate("info", M._opts.info, "table")
+	vim.validate("info.enable", M._opts.info.enable, "boolean")
+	vim.validate("info.timeout", M._opts.info.timeout, "number")
+	vim.validate("snippet", M._opts.snippet, "table")
+	vim.validate("snippet.enable", M._opts.snippet.enable, "boolean")
+	vim.validate("snippet.paths", M._opts.snippet.paths, "table")
 
 	local group = vim.api.nvim_create_augroup("Compl", { clear = true })
 
@@ -131,7 +130,7 @@ function M._start_completion()
 	local before_char = line:sub(col, col)
 
 	if
-		-- No LSP clients
+	-- No LSP clients
 		not next(vim.lsp.get_clients { bufnr = bufnr, method = "textDocument/completion" })
 		-- Not a normal buffer
 		or vim.api.nvim_get_option_value("buftype", { buf = bufnr }) ~= ""
@@ -387,15 +386,16 @@ function M._start_info()
 	if completion_item.documentation then
 		M._open_info_window(completion_item)
 	else
-		local ok, request_id = client.request("completionItem/resolve", completion_item, function(err, result)
+		local ok, request_id = client:request("completionItem/resolve", completion_item, function(err, result)
 			if not err and result.documentation then
 				M._open_info_window(result)
 			end
 		end)
 		if ok then
+			assert(request_id)
 			local cancel_fn = function()
 				if client then
-					client.cancel_request(request_id)
+					client:cancel_request(request_id)
 				end
 			end
 			table.insert(M._ctx.pending_requests, cancel_fn)
@@ -431,7 +431,7 @@ function M._open_info_window(item)
 
 	if next(lines) and next(pumpos) then
 		-- Convert lines into syntax highlighted regions and set it in the buffer
-		vim.lsp.util.stylize_markdown(M._info.bufnr, lines)
+		vim.api.nvim_buf_set_lines(M._info.bufnr, 0, -1, true, lines)
 
 		local pum_left = pumpos.col - 1
 		local pum_right = pumpos.col + pumpos.width + (pumpos.scrollbar and 1 or 0)
@@ -522,16 +522,17 @@ function M._on_completedone()
 		-- 1. Insert newline(s) right after completing an item without exiting insert mode.
 		-- 2. Undo changes.
 		-- Result: Completed item is not removed without the undo changes.
-		local ok, request_id = client.request("completionItem/resolve", completion_item, function(err, result)
+		local ok, request_id = client:request("completionItem/resolve", completion_item, function(err, result)
 			edits = (not err) and (result.additionalTextEdits or {}) or {}
 			if next(edits) then
 				vim.lsp.util.apply_text_edits(edits, bufnr, client.offset_encoding)
 			end
 		end)
 		if ok then
+			assert(request_id)
 			local cancel_fn = function()
 				if client then
-					client.cancel_request(request_id)
+					client:cancel_request(request_id)
 				end
 			end
 			table.insert(M._ctx.pending_requests, cancel_fn)
@@ -589,7 +590,7 @@ end
 
 function M._start_snippet_server()
 	if M._snippet.client_id then
-		vim.lsp.stop_client(M._snippet.client_id)
+		vim.lsp.get_client_by_id(M._snippet.client_id)
 		M._snippet.client_id = nil
 	end
 
