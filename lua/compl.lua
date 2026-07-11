@@ -250,7 +250,7 @@ function _G.Compl.completefunc(findstart, base)
 				if M._opts.completion.fuzzy then
 					local fuzzy = vim.fn.matchfuzzy({ text }, base)
 					if vim.startswith(text, base:sub(1, 1)) and (base == "" or next(fuzzy)) then
-						table.insert(matches, { client_id = client_id, item = item})
+						table.insert(matches, { client_id = client_id, item = item })
 					end
 				else
 					if vim.startswith(text, base) then
@@ -603,13 +603,21 @@ function M._start_snippet_server()
 	}
 end
 
+---@param timer uv.uv_timer_t
+---@param timeout number
+---@param callback function
+---@return function
 function M._debounce(timer, timeout, callback)
 	return function(...)
-		local argv = { ... }
-		timer:start(timeout, 0, function()
-			timer:stop()
-			vim.schedule_wrap(callback)(unpack(argv))
-		end)
+		if not timer:is_active() then
+			callback(...)
+		else
+			local argv = { ... }
+			timer:start(timeout, 0, function()
+				timer:stop()
+				vim.schedule_wrap(callback)(unpack(argv))
+			end)
+		end
 	end
 end
 
